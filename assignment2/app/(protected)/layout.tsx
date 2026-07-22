@@ -5,7 +5,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 
 export const metadata: Metadata = {
   title: {
-    default: "Dashboard | SavePlate",
+    default: "SavePlate",
     template: "%s | SavePlate",
   },
   description:
@@ -14,13 +14,13 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-type DashboardLayoutProps = {
+type ProtectedLayoutProps = {
   children: React.ReactNode;
 };
 
-export default async function DashboardLayout({
+export default async function ProtectedLayout({
   children,
-}: DashboardLayoutProps) {
+}: ProtectedLayoutProps) {
   const user = await requireCurrentUser();
 
   return (

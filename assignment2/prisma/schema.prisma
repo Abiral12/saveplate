@@ -30,23 +30,24 @@ model User {
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  sessions         Session[]
+  sessions          Session[]
+  foodItems         FoodItem[]
   verificationCodes EmailVerificationCode[]
-  privacySetting   PrivacySetting?
+  privacySetting    PrivacySetting?
 
   @@index([status], map: "idx_users_status")
   @@map("users")
 }
 
 model Session {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  tokenHash  String    @unique(map: "uk_sessions_token_hash") @map("token_hash") @db.Char(64)
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
-  ipAddress  String?   @map("ip_address") @db.VarChar(64)
-  userAgent  String?   @map("user_agent") @db.Text
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique(map: "uk_sessions_token_hash") @map("token_hash") @db.Char(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  ipAddress String?   @map("ip_address") @db.VarChar(64)
+  userAgent String?   @map("user_agent") @db.Text
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -71,16 +72,58 @@ model EmailVerificationCode {
 }
 
 model PrivacySetting {
-  id                    String            @id @default(uuid()) @db.Uuid
-  userId                String            @unique(map: "uk_privacy_settings_user") @map("user_id") @db.Uuid
-  listingVisibility     ListingVisibility @default(PRIVATE) @map("listing_visibility")
-  showContactInformation Boolean          @default(false) @map("show_contact_information")
-  expiryAlertsEnabled   Boolean           @default(true) @map("expiry_alerts_enabled")
-  donationAlertsEnabled Boolean           @default(true) @map("donation_alerts_enabled")
-  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                     String            @id @default(uuid()) @db.Uuid
+  userId                 String            @unique(map: "uk_privacy_settings_user") @map("user_id") @db.Uuid
+  listingVisibility      ListingVisibility @default(PRIVATE) @map("listing_visibility")
+  showContactInformation Boolean           @default(false) @map("show_contact_information")
+  expiryAlertsEnabled    Boolean           @default(true) @map("expiry_alerts_enabled")
+  donationAlertsEnabled  Boolean           @default(true) @map("donation_alerts_enabled")
+  createdAt              DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("privacy_settings")
+}
+
+enum FoodItemStatus {
+  AVAILABLE
+  USED
+  DISCARDED
+  RESERVED
+  DONATED
+}
+
+model FoodItem {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId String @map("user_id") @db.Uuid
+
+  itemName String @map("item_name") @db.VarChar(150)
+
+  quantity Decimal @db.Decimal(10, 2)
+
+  unit String @db.VarChar(30)
+
+  expiryDate DateTime @map("expiry_date") @db.Date
+
+  category String @db.VarChar(50)
+
+  storageLocation String? @map("storage_location") @db.VarChar(50)
+
+  status FoodItemStatus @default(AVAILABLE)
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, expiryDate])
+  @@index([userId, category])
+  @@map("food_items")
 }

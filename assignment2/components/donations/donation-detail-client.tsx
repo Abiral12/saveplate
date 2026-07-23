@@ -3,16 +3,13 @@
 import Link from "next/link";
 import {
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
+  ArrowLeft,
   HandHeart,
   LoaderCircle,
   MapPin,
-  Package,
-  Search,
+  Send,
   UserRound,
-  X,
+  XCircle,
 } from "lucide-react";
 import {
   useEffect,
@@ -20,74 +17,41 @@ import {
 } from "react";
 
 import {
+  FoodDetails,
   StatusBadge,
-  formatDateOnly,
-  getExpiryText,
-  humanizeEnum,
+  formatDate,
 } from "@/components/donations/donation-shared";
 import type {
   ApiResponse,
 } from "@/types/api";
 import type {
-  BrowseDonationsData,
+  BrowseDonationListing,
 } from "@/types/donations";
 
-const CATEGORY_OPTIONS = [
-  "DAIRY",
-  "FRUIT",
-  "VEGETABLE",
-  "MEAT",
-  "SEAFOOD",
-  "GRAIN",
-  "BAKERY",
-  "FROZEN",
-  "CANNED",
-  "BEVERAGE",
-  "SNACK",
-  "OTHER",
-];
-
-export function BrowseFoodPageClient() {
-  const [data, setData] =
-    useState<BrowseDonationsData | null>(
+export function DonationDetailClient({
+  listingId,
+}: {
+  listingId: string;
+}) {
+  const [listing, setListing] =
+    useState<BrowseDonationListing | null>(
       null,
     );
 
-  const [searchInput, setSearchInput] =
+  const [message, setMessage] =
     useState("");
-
-  const [search, setSearch] =
-    useState("");
-
-  const [location, setLocation] =
-    useState("");
-
-  const [category, setCategory] =
-    useState("");
-
-  const [expiry, setExpiry] =
-    useState("");
-
-  const [page, setPage] =
-    useState(1);
 
   const [error, setError] =
     useState<string | null>(null);
 
-  useEffect(() => {
-    const timeout =
-      window.setTimeout(() => {
-        setSearch(
-          searchInput.trim(),
-        );
-        setPage(1);
-      }, 350);
+  const [notice, setNotice] =
+    useState<string | null>(null);
 
-    return () =>
-      window.clearTimeout(
-        timeout,
-      );
-  }, [searchInput]);
+  const [actionLoading, setActionLoading] =
+    useState(false);
+
+  const [refreshKey, setRefreshKey] =
+    useState(0);
 
   useEffect(() => {
     const controller =
@@ -95,43 +59,9 @@ export function BrowseFoodPageClient() {
 
     void (async () => {
       try {
-        const parameters =
-          new URLSearchParams({
-            page: String(page),
-            size: "12",
-          });
-
-        if (search) {
-          parameters.set(
-            "search",
-            search,
-          );
-        }
-
-        if (location) {
-          parameters.set(
-            "location",
-            location,
-          );
-        }
-
-        if (category) {
-          parameters.set(
-            "category",
-            category,
-          );
-        }
-
-        if (expiry) {
-          parameters.set(
-            "expiry",
-            expiry,
-          );
-        }
-
         const response =
           await fetch(
-            `/api/browse-food?${parameters.toString()}`,
+            `/api/browse-food/${listingId}`,
             {
               credentials:
                 "include",
@@ -142,7 +72,7 @@ export function BrowseFoodPageClient() {
           );
 
         const result =
-          (await response.json()) as ApiResponse<BrowseDonationsData>;
+          (await response.json()) as ApiResponse<BrowseDonationListing>;
 
         if (
           !response.ok ||
@@ -151,7 +81,7 @@ export function BrowseFoodPageClient() {
         ) {
           throw new Error(
             result.message ||
-              "Unable to load available donations.",
+              "Unable to load donation details.",
           );
         }
 
@@ -161,7 +91,7 @@ export function BrowseFoodPageClient() {
           return;
         }
 
-        setData(result.data);
+        setListing(result.data);
         setError(null);
       } catch (loadError) {
         if (
@@ -173,7 +103,7 @@ export function BrowseFoodPageClient() {
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Unable to load available donations.",
+            : "Unable to load donation details.",
         );
       }
     })();
@@ -181,347 +111,374 @@ export function BrowseFoodPageClient() {
     return () => {
       controller.abort();
     };
-  }, [
-    category,
-    expiry,
-    location,
-    page,
-    search,
-  ]);
+  }, [listingId, refreshKey]);
 
-  function clearFilters() {
-    setSearchInput("");
-    setSearch("");
-    setLocation("");
-    setCategory("");
-    setExpiry("");
-    setPage(1);
+  async function submitRequest(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    setActionLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/donations/${listingId}/requests`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            message:
+              message.trim() ||
+              null,
+          }),
+        },
+      );
+
+      const result =
+        (await response.json()) as ApiResponse<unknown>;
+
+      if (
+        !response.ok ||
+        !result.success
+      ) {
+        throw new Error(
+          result.message ||
+            "Unable to submit the request.",
+        );
+      }
+
+      setMessage("");
+      setNotice(
+        "Your food request was submitted.",
+      );
+      setRefreshKey(
+        (current) =>
+          current + 1,
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to submit the request.",
+      );
+    } finally {
+      setActionLoading(false);
+    }
   }
 
-  const hasFilters =
-    Boolean(search) ||
-    Boolean(location) ||
-    Boolean(category) ||
-    Boolean(expiry);
+  async function cancelRequest() {
+    const request =
+      listing?.currentRequest;
 
-  return (
-    <div className="mx-auto w-full max-w-[1500px] px-5 py-6 sm:px-7 sm:py-8 xl:px-10">
-      <section className="relative overflow-hidden rounded-[28px] bg-[#052E24] px-6 py-8 text-white sm:px-8 sm:py-10">
-        <div className="pointer-events-none absolute -right-20 -top-28 size-80 rounded-full bg-[#BEF264]/15 blur-3xl" />
+    if (!request) {
+      return;
+    }
 
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-3.5 py-2 text-xs font-extrabold uppercase tracking-[0.14em] text-[#DFFFAF]">
-            <HandHeart className="size-4" />
-            Community food
-          </div>
+    setActionLoading(true);
 
-          <h1 className="mt-5 text-4xl font-extrabold tracking-[-0.055em] sm:text-5xl">
-            Browse food shared by
-            others.
+    try {
+      const response = await fetch(
+        `/api/donation-requests/${request.id}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            action: "CANCEL",
+          }),
+        },
+      );
+
+      const result =
+        (await response.json()) as ApiResponse<unknown>;
+
+      if (
+        !response.ok ||
+        !result.success
+      ) {
+        throw new Error(
+          result.message ||
+            "Unable to cancel the request.",
+        );
+      }
+
+      setNotice(
+        "Your request was cancelled.",
+      );
+
+      setRefreshKey(
+        (current) =>
+          current + 1,
+      );
+    } catch (cancelError) {
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : "Unable to cancel the request.",
+      );
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  if (!listing && !error) {
+    return (
+      <div className="grid min-h-[70vh] place-items-center">
+        <LoaderCircle className="size-8 animate-spin text-[#0C8A63]" />
+      </div>
+    );
+  }
+
+  if (!listing) {
+    return (
+      <div className="mx-auto max-w-3xl px-5 py-12">
+        <div className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] p-6 text-[#B91C1C]">
+          <AlertCircle className="size-7" />
+          <h1 className="mt-4 text-xl font-extrabold">
+            Donation unavailable
           </h1>
-
-          <p className="mt-4 max-w-2xl text-base leading-7 text-white/65 sm:text-lg">
-            Find available food near
-            you, review the pickup
-            details and submit a
-            request to the donor.
+          <p className="mt-2 text-sm">
+            {error}
           </p>
         </div>
-      </section>
+      </div>
+    );
+  }
 
-      {error ? (
-        <div className="mt-6 flex items-start gap-3 rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-5 py-4 text-sm font-bold text-[#B91C1C]">
-          <AlertCircle className="size-5 shrink-0" />
-          <p>{error}</p>
+  return (
+    <div className="mx-auto w-full max-w-6xl px-5 py-6 sm:px-7 sm:py-8">
+      <Link
+        href="/browse-food"
+        className="inline-flex items-center gap-2 text-sm font-extrabold text-[#065F46]"
+      >
+        <ArrowLeft className="size-4" />
+        Back to Browse Food
+      </Link>
+
+      {notice ? (
+        <div className="mt-5 rounded-2xl border border-[#BBE6CB] bg-[#EDFBF2] px-5 py-4 text-sm font-bold text-[#166534]">
+          {notice}
         </div>
       ) : null}
 
-      <section className="mt-6 rounded-[24px] border border-[#DFE6DE] bg-white p-5 sm:p-6">
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(170px,0.6fr))_auto]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[#849087]" />
-
-            <input
-              type="search"
-              value={searchInput}
-              onChange={(event) =>
-                setSearchInput(
-                  event.target.value,
-                )
-              }
-              placeholder="Search food..."
-              className="h-12 w-full rounded-xl border border-[#D8E1D9] bg-[#F9FBF8] pl-12 pr-4 text-sm font-semibold outline-none focus:border-[#0C8A63]"
-            />
-          </div>
-
-          <div className="relative">
-            <MapPin className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[#849087]" />
-
-            <input
-              value={location}
-              onChange={(event) => {
-                setLocation(
-                  event.target.value,
-                );
-                setPage(1);
-              }}
-              placeholder="Pickup area"
-              className="h-12 w-full rounded-xl border border-[#D8E1D9] pl-11 pr-3 text-sm font-semibold outline-none"
-            />
-          </div>
-
-          <select
-            value={category}
-            onChange={(event) => {
-              setCategory(
-                event.target.value,
-              );
-              setPage(1);
-            }}
-            className="h-12 rounded-xl border border-[#D8E1D9] px-3 text-sm font-bold"
-          >
-            <option value="">
-              All categories
-            </option>
-
-            {CATEGORY_OPTIONS.map(
-              (option) => (
-                <option
-                  key={option}
-                  value={option}
-                >
-                  {humanizeEnum(
-                    option,
-                  )}
-                </option>
-              ),
-            )}
-          </select>
-
-          <select
-            value={expiry}
-            onChange={(event) => {
-              setExpiry(
-                event.target.value,
-              );
-              setPage(1);
-            }}
-            className="h-12 rounded-xl border border-[#D8E1D9] px-3 text-sm font-bold"
-          >
-            <option value="">
-              Any expiry
-            </option>
-            <option value="soon">
-              Within 7 days
-            </option>
-            <option value="later">
-              More than 7 days
-            </option>
-          </select>
-
-          {hasFilters ? (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8E1D9] px-4 text-sm font-extrabold text-[#536159]"
-            >
-              <X className="size-4" />
-              Clear
-            </button>
-          ) : null}
+      {error ? (
+        <div className="mt-5 rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-5 py-4 text-sm font-bold text-[#B91C1C]">
+          {error}
         </div>
+      ) : null}
 
-        {data === null && !error ? (
-          <div className="grid min-h-[430px] place-items-center">
-            <LoaderCircle className="size-8 animate-spin text-[#0C8A63]" />
-          </div>
-        ) : data?.items.length ===
-          0 ? (
-          <div className="mt-6 flex min-h-[400px] flex-col items-center justify-center rounded-2xl border border-dashed border-[#C9D8CA] bg-[#F7F9F4] px-6 text-center">
-            <HandHeart className="size-12 text-[#065F46]" />
+      <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="rounded-[24px] border border-[#DFE6DE] bg-white p-6 sm:p-8">
+          <div className="flex items-start justify-between gap-4">
+            <span className="grid size-16 place-items-center rounded-2xl bg-[#E8F8EE] text-[#087554]">
+              <HandHeart className="size-8" />
+            </span>
 
-            <h2 className="mt-5 text-xl font-extrabold">
-              No available donations
-            </h2>
-
-            <p className="mt-2 max-w-md text-sm leading-6 text-[#6C7D75]">
-              No listings currently
-              match your search and
-              filters.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-6 grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
-            {data?.items.map(
-              (listing) => (
-                <article
-                  key={listing.id}
-                  className="flex flex-col rounded-2xl border border-[#DFE6DE] p-5 transition hover:-translate-y-0.5 hover:shadow-lg"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <span className="grid size-12 place-items-center rounded-2xl bg-[#E8F8EE] text-[#087554]">
-                      <Package className="size-6" />
-                    </span>
-
-                    {listing.currentRequest ? (
-                      <StatusBadge
-                        status={
-                          listing
-                            .currentRequest
-                            .status
-                        }
-                      />
-                    ) : (
-                      <StatusBadge
-                        status={
-                          listing.status
-                        }
-                      />
-                    )}
-                  </div>
-
-                  <p className="mt-5 text-xs font-extrabold uppercase tracking-[0.14em] text-[#0C8A63]">
-                    {humanizeEnum(
-                      listing.foodItem
-                        .category,
-                    )}
-                  </p>
-
-                  <h2 className="mt-2 text-2xl font-extrabold tracking-[-0.04em]">
-                    {
-                      listing.foodItem
-                        .itemName
-                    }
-                  </h2>
-
-                  <p className="mt-2 text-sm font-bold text-[#627169]">
-                    {
-                      listing.foodItem
-                        .quantity
-                    }{" "}
-                    {humanizeEnum(
-                      listing.foodItem
-                        .unit,
-                    )}
-                  </p>
-
-                  <div className="mt-5 space-y-3 border-t border-[#E4E9E4] pt-4">
-                    <div className="flex items-start gap-3">
-                      <Clock3 className="mt-0.5 size-4 text-[#EA580C]" />
-
-                      <div>
-                        <p className="text-sm font-extrabold">
-                          {formatDateOnly(
-                            listing
-                              .foodItem
-                              .expiryDate,
-                          )}
-                        </p>
-
-                        <p className="mt-1 text-xs font-bold text-[#EA580C]">
-                          {getExpiryText(
-                            listing.foodItem,
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <MapPin className="mt-0.5 size-4 text-[#3158B7]" />
-
-                      <p className="text-sm font-semibold text-[#536159]">
-                        {
-                          listing.pickupLocation
-                        }
-                      </p>
-                    </div>
-
-                    <div className="flex items-start gap-3">
-                      <UserRound className="mt-0.5 size-4 text-[#527417]" />
-
-                      <p className="text-sm font-semibold text-[#536159]">
-                        Shared by{" "}
-                        <span className="font-extrabold">
-                          {
-                            listing.donor
-                              .fullName
-                          }
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <p className="mt-4 line-clamp-2 text-sm leading-6 text-[#738179]">
-                    {
-                      listing.availabilityDetails
-                    }
-                  </p>
-
-                  <Link
-                    href={`/browse-food/${listing.id}`}
-                    className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-[#065F46] px-5 text-sm font-extrabold text-white transition hover:bg-[#054C39]"
-                  >
-                    {listing.currentRequest
-                      ? "View request"
-                      : "View details"}
-                  </Link>
-                </article>
-              ),
-            )}
-          </div>
-        )}
-
-        {data &&
-        data.pagination.totalPages >
-          1 ? (
-          <div className="mt-6 flex items-center justify-between border-t border-[#E5EAE5] pt-5">
-            <p className="text-sm font-semibold text-[#728078]">
-              Page{" "}
-              {data.pagination.page} of{" "}
-              {
-                data.pagination
-                  .totalPages
+            <StatusBadge
+              status={
+                listing.currentRequest
+                  ?.status ??
+                listing.status
               }
-            </p>
+            />
+          </div>
 
-            <div className="flex gap-2">
-              <button
-                disabled={
-                  !data.pagination
-                    .hasPrevious
-                }
-                onClick={() =>
-                  setPage((current) =>
-                    Math.max(
-                      1,
-                      current - 1,
-                    ),
-                  )
-                }
-                className="grid size-10 place-items-center rounded-xl border disabled:opacity-40"
-              >
-                <ChevronLeft className="size-4" />
-              </button>
+          <p className="mt-6 text-xs font-extrabold uppercase tracking-[0.15em] text-[#0C8A63]">
+            {
+              listing.foodItem
+                .category
+            }
+          </p>
 
-              <button
-                disabled={
-                  !data.pagination
-                    .hasNext
+          <h1 className="mt-2 text-4xl font-extrabold tracking-[-0.055em]">
+            {
+              listing.foodItem
+                .itemName
+            }
+          </h1>
+
+          <p className="mt-3 text-sm text-[#718078]">
+            Listing created{" "}
+            {formatDate(
+              listing.createdAt,
+            )}
+          </p>
+
+          <div className="mt-7">
+            <FoodDetails
+              item={listing.foodItem}
+            />
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-[#E0E7E0] p-5">
+              <MapPin className="size-5 text-[#3158B7]" />
+
+              <p className="mt-4 text-xs font-extrabold uppercase tracking-wide text-[#7B8981]">
+                Pickup location
+              </p>
+
+              <p className="mt-2 font-extrabold">
+                {
+                  listing.pickupLocation
                 }
-                onClick={() =>
-                  setPage(
-                    (current) =>
-                      current + 1,
-                  )
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-[#E0E7E0] p-5">
+              <UserRound className="size-5 text-[#527417]" />
+
+              <p className="mt-4 text-xs font-extrabold uppercase tracking-wide text-[#7B8981]">
+                Donor
+              </p>
+
+              <p className="mt-2 font-extrabold">
+                {
+                  listing.donor
+                    .fullName
                 }
-                className="grid size-10 place-items-center rounded-xl border disabled:opacity-40"
-              >
-                <ChevronRight className="size-4" />
-              </button>
+              </p>
             </div>
           </div>
-        ) : null}
-      </section>
+
+          <div className="mt-6 rounded-2xl bg-[#F7F9F6] p-5">
+            <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[#0C8A63]">
+              Availability
+            </p>
+
+            <p className="mt-2 text-sm leading-6 text-[#536159]">
+              {
+                listing.availabilityDetails
+              }
+            </p>
+          </div>
+
+          {listing.notes ? (
+            <div className="mt-5 rounded-2xl bg-[#FFF7ED] p-5">
+              <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-[#C2410C]">
+                Donor notes
+              </p>
+
+              <p className="mt-2 text-sm leading-6 text-[#7C4A1F]">
+                {listing.notes}
+              </p>
+            </div>
+          ) : null}
+        </section>
+
+        <aside className="rounded-[24px] border border-[#DFE6DE] bg-white p-6">
+          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-[#0C8A63]">
+            Food request
+          </p>
+
+          {!listing.currentRequest ? (
+            <>
+              <h2 className="mt-2 text-2xl font-extrabold tracking-[-0.04em]">
+                Request this food
+              </h2>
+
+              <p className="mt-2 text-sm leading-6 text-[#6C7D75]">
+                Send a brief message
+                explaining when you can
+                collect the item.
+              </p>
+
+              <form
+                onSubmit={submitRequest}
+                className="mt-6"
+              >
+                <textarea
+                  rows={6}
+                  maxLength={500}
+                  value={message}
+                  onChange={(event) =>
+                    setMessage(
+                      event.target.value,
+                    )
+                  }
+                  placeholder="For example: I can collect tomorrow after 6 PM."
+                  className="w-full resize-none rounded-xl border border-[#D8E1D9] p-4 text-sm font-semibold leading-6 outline-none focus:border-[#0C8A63]"
+                />
+
+                <button
+                  type="submit"
+                  disabled={
+                    actionLoading
+                  }
+                  className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#065F46] px-5 text-sm font-extrabold text-white disabled:opacity-60"
+                >
+                  {actionLoading ? (
+                    <LoaderCircle className="size-5 animate-spin" />
+                  ) : (
+                    <Send className="size-5" />
+                  )}
+                  Submit request
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <h2 className="mt-2 text-2xl font-extrabold tracking-[-0.04em]">
+                Request submitted
+              </h2>
+
+              <div className="mt-5">
+                <StatusBadge
+                  status={
+                    listing
+                      .currentRequest
+                      .status
+                  }
+                />
+              </div>
+
+              {listing.currentRequest
+                .message ? (
+                <p className="mt-5 rounded-xl bg-[#F7F9F6] p-4 text-sm leading-6 text-[#536159]">
+                  {
+                    listing
+                      .currentRequest
+                      .message
+                  }
+                </p>
+              ) : null}
+
+              {listing.currentRequest
+                .status ===
+              "PENDING" ? (
+                <button
+                  type="button"
+                  disabled={
+                    actionLoading
+                  }
+                  onClick={() =>
+                    void cancelRequest()
+                  }
+                  className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-[#F2CCCC] text-sm font-extrabold text-[#DC2626]"
+                >
+                  <XCircle className="size-4" />
+                  Cancel request
+                </button>
+              ) : null}
+
+              <Link
+                href="/requests"
+                className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-[#D7E0D8] text-sm font-extrabold text-[#065F46]"
+              >
+                View My Requests
+              </Link>
+            </>
+          )}
+        </aside>
+      </div>
     </div>
   );
 }

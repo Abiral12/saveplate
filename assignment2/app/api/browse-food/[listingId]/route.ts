@@ -7,38 +7,43 @@ import {
 import { requireApiUser } from "@/lib/auth/require-api-user";
 
 import {
-  browseDonationsQuerySchema,
+  uuidSchema,
 } from "@/modules/donations/donation.schemas";
 
 import {
-  browseDonationsService,
+  getBrowseDonationByIdService,
 } from "@/modules/donations/donation.service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type RouteContext = {
+  params: Promise<{
+    listingId: string;
+  }>;
+};
+
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
+  context: RouteContext,
 ) {
   try {
     const user =
       await requireApiUser();
 
-    const query =
-      browseDonationsQuerySchema.parse(
-        Object.fromEntries(
-          request.nextUrl.searchParams.entries(),
+    const { listingId } =
+      await context.params;
+
+    const result =
+      await getBrowseDonationByIdService(
+        user.id,
+        uuidSchema.parse(
+          listingId,
         ),
       );
 
-    const result =
-      await browseDonationsService(
-        user.id,
-        query,
-      );
-
     return ok(
-      "Available donations retrieved successfully.",
+      "Donation details retrieved successfully.",
       result,
     );
   } catch (error) {

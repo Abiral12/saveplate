@@ -13,6 +13,7 @@ import {
   Bell,
   CalendarDays,
   ChevronRight,
+  ClipboardList,
   HandHeart,
   LayoutDashboard,
   LoaderCircle,
@@ -20,7 +21,7 @@ import {
   Menu,
   PackageSearch,
   PlusCircle,
-  Settings2,
+  Search,
   X,
 } from "lucide-react";
 
@@ -70,12 +71,17 @@ const primaryNavigation: NavigationItem[] = [
     icon: HandHeart,
   },
   {
-    label: "Privacy settings",
-    href: "/settings/privacy",
-    icon: Settings2,
+    label: "Browse foods",
+    href: "/browse-food",
+    icon: Search,
   },
+  {
+    label: "My requests",
+    href: "/requests",
+    icon: ClipboardList,
+  },
+  
 ];
-
 const futureNavigation: NavigationItem[] = [
   {
     label: "Meal planner",
@@ -98,7 +104,10 @@ const futureNavigation: NavigationItem[] = [
 ];
 
 function getInitials(fullName: string): string {
-  const names = fullName.trim().split(/\s+/).filter(Boolean);
+  const names = fullName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
 
   if (names.length === 0) {
     return "SP";
@@ -118,7 +127,30 @@ function isNavigationItemActive(
     return pathname === "/dashboard";
   }
 
-  return pathname === href || pathname.startsWith(`${href}/`);
+  /*
+   * Add food item is a separate navigation entry, so it must
+   * only be active on its exact route.
+   */
+  if (href === "/inventory/new") {
+    return pathname === "/inventory/new";
+  }
+
+  /*
+   * Keep My inventory active for inventory detail/edit routes,
+   * but not while the Add food item page is open.
+   */
+  if (href === "/inventory") {
+    return (
+      pathname === "/inventory" ||
+      (pathname.startsWith("/inventory/") &&
+        pathname !== "/inventory/new")
+    );
+  }
+
+  return (
+    pathname === href ||
+    pathname.startsWith(`${href}/`)
+  );
 }
 
 type SidebarContentProps = {
@@ -149,9 +181,13 @@ function SidebarContent({
           Household
         </p>
 
-        <nav className="mt-3 space-y-1" aria-label="Main navigation">
+        <nav
+          className="mt-3 space-y-1"
+          aria-label="Main navigation"
+        >
           {primaryNavigation.map((item) => {
             const Icon = item.icon;
+
             const active = isNavigationItemActive(
               pathname,
               item.href,
@@ -162,6 +198,7 @@ function SidebarContent({
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
+                aria-current={active ? "page" : undefined}
                 className={cn(
                   "group flex items-center gap-3 rounded-xl px-3 py-3",
                   "text-sm font-bold transition",
@@ -172,9 +209,14 @@ function SidebarContent({
                     : "text-white/70 hover:bg-white/[0.07] hover:text-white",
                 )}
               >
-                <Icon className="size-5" aria-hidden={true} />
+                <Icon
+                  className="size-5"
+                  aria-hidden={true}
+                />
 
-                <span className="flex-1">{item.label}</span>
+                <span className="flex-1">
+                  {item.label}
+                </span>
 
                 {active ? (
                   <ChevronRight
@@ -203,11 +245,17 @@ function SidebarContent({
             return (
               <div
                 key={item.href}
+                aria-disabled="true"
                 className="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-white/35"
               >
-                <Icon className="size-5" aria-hidden={true} />
+                <Icon
+                  className="size-5"
+                  aria-hidden={true}
+                />
 
-                <span className="flex-1">{item.label}</span>
+                <span className="flex-1">
+                  {item.label}
+                </span>
 
                 <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider">
                   Soon
@@ -269,7 +317,10 @@ function SidebarContent({
               </>
             ) : (
               <>
-                <LogOut className="size-4" aria-hidden={true} />
+                <LogOut
+                  className="size-4"
+                  aria-hidden={true}
+                />
                 Log out
               </>
             )}
@@ -287,11 +338,15 @@ export function DashboardShell({
   const pathname = usePathname();
   const router = useRouter();
 
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [logoutError, setLogoutError] = useState<string | null>(
-    null,
-  );
+  const [mobileMenuOpen, setMobileMenuOpen] =
+    useState(false);
+
+  const [isLoggingOut, setIsLoggingOut] =
+    useState(false);
+
+  const [logoutError, setLogoutError] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -303,7 +358,9 @@ export function DashboardShell({
       return;
     }
 
-    const previousOverflow = document.body.style.overflow;
+    const previousOverflow =
+      document.body.style.overflow;
+
     document.body.style.overflow = "hidden";
 
     function closeOnEscape(event: KeyboardEvent) {
@@ -312,11 +369,19 @@ export function DashboardShell({
       }
     }
 
-    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener(
+      "keydown",
+      closeOnEscape,
+    );
 
     return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", closeOnEscape);
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        "keydown",
+        closeOnEscape,
+      );
     };
   }, [mobileMenuOpen]);
 
@@ -325,16 +390,21 @@ export function DashboardShell({
     setLogoutError(null);
 
     try {
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
+      const response = await fetch(
+        "/api/auth/logout",
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+          },
+          credentials: "include",
         },
-        credentials: "include",
-      });
+      );
 
       if (!response.ok) {
-        throw new Error("Logout request failed.");
+        throw new Error(
+          "Logout request failed.",
+        );
       }
 
       router.replace("/login?loggedOut=true");
@@ -343,6 +413,7 @@ export function DashboardShell({
       setLogoutError(
         "Logout could not be completed. Please try again.",
       );
+
       setIsLoggingOut(false);
     }
   }
@@ -365,12 +436,17 @@ export function DashboardShell({
 
           <button
             type="button"
-            onClick={() => setMobileMenuOpen(true)}
+            onClick={() =>
+              setMobileMenuOpen(true)
+            }
             aria-label="Open dashboard navigation"
             aria-expanded={mobileMenuOpen}
             className="grid size-10 place-items-center rounded-xl border border-[#D8E1D8] bg-white text-[#065F46] shadow-sm"
           >
-            <Menu className="size-5" aria-hidden={true} />
+            <Menu
+              className="size-5"
+              aria-hidden={true}
+            />
           </button>
         </header>
 
@@ -379,18 +455,25 @@ export function DashboardShell({
             <button
               type="button"
               className="absolute inset-0 bg-[#052E24]/55 backdrop-blur-sm"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() =>
+                setMobileMenuOpen(false)
+              }
               aria-label="Close dashboard navigation"
             />
 
             <aside className="absolute inset-y-0 left-0 w-[min(88vw,320px)] shadow-2xl">
               <button
                 type="button"
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={() =>
+                  setMobileMenuOpen(false)
+                }
                 aria-label="Close dashboard navigation"
                 className="absolute right-4 top-5 z-10 grid size-9 place-items-center rounded-xl bg-white/10 text-white"
               >
-                <X className="size-5" aria-hidden={true} />
+                <X
+                  className="size-5"
+                  aria-hidden={true}
+                />
               </button>
 
               <SidebarContent
@@ -398,14 +481,18 @@ export function DashboardShell({
                 pathname={pathname}
                 isLoggingOut={isLoggingOut}
                 logoutError={logoutError}
-                onNavigate={() => setMobileMenuOpen(false)}
+                onNavigate={() =>
+                  setMobileMenuOpen(false)
+                }
                 onLogout={handleLogout}
               />
             </aside>
           </div>
         ) : null}
 
-        <main className="min-h-screen">{children}</main>
+        <main className="min-h-screen">
+          {children}
+        </main>
       </div>
     </div>
   );

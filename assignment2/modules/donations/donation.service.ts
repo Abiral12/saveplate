@@ -1392,58 +1392,61 @@ async function rejectRequest(
   donorId: string,
   requestId: string,
 ) {
-  const request =
-    await prisma.donationRequest.findFirst({
-      where: {
-        id: requestId,
+  return withSerializableRetry(
+    async (transaction) => {
+      const request =
+        await transaction.donationRequest.findFirst({
+          where: {
+            id: requestId,
 
-        listing: {
-          is: {
-            donorId,
+            listing: {
+              is: {
+                donorId,
+              },
+            },
           },
+
+          select: {
+            id: true,
+          },
+        });
+
+      if (!request) {
+        throw new ApiError(
+          404,
+          "Donation request was not found.",
+        );
+      }
+
+      const updated =
+        await transaction.donationRequest.updateMany({
+          where: {
+            id: request.id,
+            status: DonationRequestStatus.PENDING,
+          },
+
+          data: {
+            status: DonationRequestStatus.REJECTED,
+            respondedAt: new Date(),
+          },
+        });
+
+      if (updated.count !== 1) {
+        throw new ApiError(
+          409,
+          "Only pending requests can be rejected.",
+        );
+      }
+
+      return transaction.donationRequest.findUniqueOrThrow({
+        where: {
+          id: request.id,
         },
-      },
 
-      select: {
-        id: true,
-        status: true,
-      },
-    });
-
-  if (!request) {
-    throw new ApiError(
-      404,
-      "Donation request was not found.",
-    );
-  }
-
-  if (
-    request.status !==
-    DonationRequestStatus.PENDING
-  ) {
-    throw new ApiError(
-      409,
-      "Only pending requests can be rejected.",
-    );
-  }
-
-  const updated =
-    await prisma.donationRequest.update({
-      where: {
-        id: request.id,
-      },
-
-      data: {
-        status:
-          DonationRequestStatus.REJECTED,
-        respondedAt:
-          new Date(),
-      },
-
-      select: requestSelect,
-    });
-
-  return updated;
+        select: requestSelect,
+      });
+    },
+  );
 }
 
 async function claimRequest(

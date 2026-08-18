@@ -99,7 +99,6 @@ const futureNavigation: NavigationItem[] = [
     label: "Food analytics",
     href: "/analytics",
     icon: BarChart3,
-    comingSoon: true,
   },
 ];
 
@@ -241,6 +240,31 @@ function SidebarContent({
         >
           {futureNavigation.map((item) => {
             const Icon = item.icon;
+            const active = isNavigationItemActive(pathname, item.href);
+
+            if (!item.comingSoon) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "group flex items-center gap-3 rounded-xl px-3 py-3",
+                    "text-sm font-bold transition",
+                    "focus-visible:outline-none focus-visible:ring-2",
+                    "focus-visible:ring-[#BEF264]/60",
+                    active
+                      ? "bg-[#BEF264] text-[#052E24]"
+                      : "text-white/70 hover:bg-white/[0.07] hover:text-white",
+                  )}
+                >
+                  <Icon className="size-5" aria-hidden={true} />
+                  <span className="flex-1">{item.label}</span>
+                  {active ? <ChevronRight className="size-4" aria-hidden={true} /> : null}
+                </Link>
+              );
+            }
 
             return (
               <div
@@ -248,15 +272,8 @@ function SidebarContent({
                 aria-disabled="true"
                 className="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-3 text-sm font-bold text-white/35"
               >
-                <Icon
-                  className="size-5"
-                  aria-hidden={true}
-                />
-
-                <span className="flex-1">
-                  {item.label}
-                </span>
-
+                <Icon className="size-5" aria-hidden={true} />
+                <span className="flex-1">{item.label}</span>
                 <span className="rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider">
                   Soon
                 </span>

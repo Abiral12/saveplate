@@ -96,18 +96,33 @@ export async function getMealPlannerService(userId: string, weekStartInput: stri
       orderBy: [{ expiryDate: "asc" }, { itemName: "asc" }],
     }),
     prisma.mealPlanIngredient.groupBy({
-      by: ["foodItemId"],
-      where: {
-        plannedMeal: {
-          mealPlan: { userId, status: "CONFIRMED" },
-          mealDate: { gte: new Date() },
-        },
+  by: ["foodItemId"],
+  where: {
+    plannedMeal: {
+      mealPlan: {
+        userId,
+        status: "CONFIRMED",
       },
-      _sum: { reservedQuantity: true },
-    }),
+      mealDate: {
+        gte: new Date(),
+      },
+    },
+  },
+  _sum: {
+    reservedQuantity: true,
+  },
+  orderBy: {
+    foodItemId: "asc",
+  },
+}),
   ]);
 
-  const reservedMap = new Map(reservations.map((row) => [row.foodItemId, Number(row._sum.reservedQuantity ?? 0)]));
+ const reservedMap = new Map(
+  reservations.map((row) => [
+    row.foodItemId,
+    Number(row._sum?.reservedQuantity ?? 0),
+  ]),
+);
   const today = new Date();
   const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
 
@@ -228,7 +243,7 @@ export async function confirmMealPlanService(userId: string, weekStartInput: str
     },
     _sum: { reservedQuantity: true },
   });
-  const externalMap = new Map(externalReservations.map((row) => [row.foodItemId, Number(row._sum.reservedQuantity ?? 0)]));
+  const externalMap = new Map(externalReservations.map((row) => [row.foodItemId, Number(row._sum?.reservedQuantity ?? 0)]));
 
   for (const [itemId, value] of needed) {
     if (value.quantity + (externalMap.get(itemId) ?? 0) > value.stock) {

@@ -38,6 +38,8 @@ model User {
 
   donatedListings  DonationListing[] @relation("DonationDonor")
   donationRequests DonationRequest[] @relation("DonationRequester")
+  mealPlans        MealPlan[]
+  notifications    Notification[]
 
   @@index([status], map: "idx_users_status")
   @@map("users")
@@ -125,6 +127,7 @@ model FoodItem {
 
   user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   donationListings DonationListing[]
+  mealIngredients  MealPlanIngredient[]
 
   @@index([userId])
   @@index([userId, status])
@@ -208,3 +211,91 @@ model DonationRequest {
   @@index([createdAt])
   @@map("donation_requests")
 }
+
+enum MealPlanStatus {
+  DRAFT
+  CONFIRMED
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+model MealPlan {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @map("user_id") @db.Uuid
+  weekStart DateTime       @map("week_start") @db.Date
+  status    MealPlanStatus @default(DRAFT)
+  confirmedAt DateTime?    @map("confirmed_at") @db.Timestamptz(6)
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meals PlannedMeal[]
+
+  @@unique([userId, weekStart], map: "uk_meal_plans_user_week")
+  @@index([userId, weekStart], map: "idx_meal_plans_user_week")
+  @@map("meal_plans")
+}
+
+model PlannedMeal {
+  id         String   @id @default(uuid()) @db.Uuid
+  mealPlanId String   @map("meal_plan_id") @db.Uuid
+  mealDate   DateTime @map("meal_date") @db.Date
+  mealType   MealType @map("meal_type")
+  title      String   @db.VarChar(150)
+  notes      String?  @db.Text
+  reminderAt DateTime? @map("reminder_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  mealPlan    MealPlan             @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  ingredients MealPlanIngredient[]
+
+  @@index([mealPlanId, mealDate], map: "idx_planned_meals_plan_date")
+  @@map("planned_meals")
+}
+
+model MealPlanIngredient {
+  id               String   @id @default(uuid()) @db.Uuid
+  plannedMealId    String   @map("planned_meal_id") @db.Uuid
+  foodItemId       String   @map("food_item_id") @db.Uuid
+  reservedQuantity Decimal  @map("reserved_quantity") @db.Decimal(10, 2)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  plannedMeal PlannedMeal @relation(fields: [plannedMealId], references: [id], onDelete: Cascade)
+  foodItem    FoodItem    @relation(fields: [foodItemId], references: [id], onDelete: Restrict)
+
+  @@unique([plannedMealId, foodItemId], map: "uk_meal_ingredient_item")
+  @@index([foodItemId], map: "idx_meal_ingredients_food_item")
+  @@map("meal_plan_ingredients")
+}
+
+enum NotificationType {
+  EXPIRY
+  DONATION
+  MEAL_REMINDER
+  ACCOUNT
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String           @db.VarChar(160)
+  message   String           @db.VarChar(500)
+  href      String?          @db.VarChar(300)
+  sourceKey String           @map("source_key") @db.VarChar(220)
+  readAt    DateTime?        @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sourceKey], map: "uk_notifications_user_source")
+  @@index([userId, readAt, createdAt], map: "idx_notifications_user_read_created")
+  @@map("notifications")
+}
+

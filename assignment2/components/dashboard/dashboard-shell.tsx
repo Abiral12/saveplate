@@ -87,13 +87,11 @@ const futureNavigation: NavigationItem[] = [
     label: "Meal planner",
     href: "/meal-planner",
     icon: CalendarDays,
-    comingSoon: true,
   },
   {
     label: "Notifications",
     href: "/notifications",
     icon: Bell,
-    comingSoon: true,
   },
   {
     label: "Food analytics",
